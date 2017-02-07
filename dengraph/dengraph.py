@@ -34,6 +34,8 @@ class DenGraphIO(dengraph.graph.Graph):
         self._init_cluster()
 
     def _merge_clusters(self, base_cluster, cluster):
+        if len(base_cluster) > len(cluster):
+            base_cluster, cluster = cluster, base_cluster
         base_cluster += cluster
         if base_cluster != cluster:
             try:
@@ -86,7 +88,14 @@ class DenGraphIO(dengraph.graph.Graph):
             cluster = self.core_cluster_for_node(core_node=node)
         except NoSuchCluster:
             result = len(neighbours) >= self.core_neighbours
-            cluster = None
+            for neighbour in neighbours:
+                try:
+                    cluster = self.core_cluster_for_node(neighbour)
+                    break
+                except NoSuchCluster:
+                    pass
+            else:
+                cluster = None
         # return the current result and also the neighbours for further reference
         return result, cluster, neighbours
 
@@ -211,10 +220,11 @@ class DenGraphIO(dengraph.graph.Graph):
         for node in nodes:
             becomes_core, cluster, neighbours = self._test_change_to_core(node=node)
             if becomes_core:
-                this_cluster = dengraph.cluster.DenGraphCluster(self.graph)
-                self.clusters.append(this_cluster)
-                self._add_node_to_cluster(node=node, cluster=this_cluster, state=this_cluster.CORE_NODE)
-                self._merge_neighbours(neighbours=neighbours, cluster=this_cluster)
+                if cluster is None:
+                    cluster = dengraph.cluster.DenGraphCluster(self.graph)
+                    self.clusters.append(cluster)
+                self._add_node_to_cluster(node=node, cluster=cluster, state=cluster.CORE_NODE)
+                self._merge_neighbours(neighbours=neighbours, cluster=cluster)
             elif cluster and new_node:
                 self._add_node_to_cluster(node=new_node, cluster=cluster, state=cluster.BORDER_NODE)
 
